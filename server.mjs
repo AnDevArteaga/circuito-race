@@ -1,10 +1,11 @@
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { performance } from 'node:perf_hooks';
-import { Race } from './race.mjs';
+import { Race, avatarDomains } from './race.mjs';
 
 const host = '127.0.0.1';
 const port = Number(process.env.PORT || 8765);
+const avatarSources = avatarDomains.map((domain) => 'https://*.' + domain).join(' ');
 const race = new Race();
 const clients = new Set();
 let socket;
@@ -167,7 +168,7 @@ const server = createServer(async (request, response) => {
     const content = await readFile(new URL('./public/' + file[0], import.meta.url));
     response.writeHead(200, {
       'Content-Type': file[1], 'Cache-Control': 'no-cache', 'X-Content-Type-Options': 'nosniff',
-      'Content-Security-Policy': "default-src 'self'; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'",
+      'Content-Security-Policy': "default-src 'self'; img-src 'self' " + avatarSources + "; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'",
     });
     response.end(content);
   } catch {

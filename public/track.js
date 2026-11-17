@@ -238,24 +238,56 @@ export function createTrack(canvas) {
     ctx.restore();
   }
 
+  const portraits = new Map();
+
   function driverLabel(player, { x, y }, rank, occupied) {
+    let portrait = portraits.get(player.avatar);
+    if (player.avatar && !portrait) {
+      portrait = new Image();
+      portrait.referrerPolicy = 'no-referrer';
+      portrait.src = player.avatar;
+      if (portraits.size >= 144) portraits.delete(portraits.keys().next().value);
+      portraits.set(player.avatar, portrait);
+    }
+    const hasPhoto = portrait?.complete && portrait.naturalWidth > 0;
     const name = [...player.name].slice(0, 12).join('');
     ctx.font = '800 11px system-ui, sans-serif';
-    const labelWidth = Math.ceil(ctx.measureText(name).width) + 12;
-    const offsets = [[0, 0], [-24, -10], [24, -10], [0, -20], [-40, -22], [40, -22]];
+    const labelWidth = hasPhoto ? 24 : Math.ceil(ctx.measureText(name).width) + 12;
+    const labelHeight = hasPhoto ? 24 : 15;
+    const offsets = [[0, 0], [-24, -7], [24, -7], [0, -24], [-45, -20], [45, -20], [-26, -34], [26, -34]];
     for (const [dx, dy] of offsets) {
       const left = Math.min(width - labelWidth - 2, Math.max(2, x - labelWidth / 2 + dx));
-      const top = y - 28 + dy;
+      const top = y - 13 - labelHeight + dy;
       const right = left + labelWidth;
+      const bottom = top + labelHeight;
       const fits = occupied.every((box) => right + 2 < box.left || left > box.right + 2 ||
-        top + 17 < box.top || top > box.top + 17);
+        bottom + 2 < box.top || top > box.bottom + 2);
       if (!fits) continue;
-      occupied.push({ left, top, right });
-      tile(ctx, left, top, labelWidth, 15, 4, '#17182bf1');
-      ctx.fillStyle = rank === 0 ? '#f8e983' : '#fff';
-      ctx.textBaseline = 'middle';
-      ctx.textAlign = 'center';
-      ctx.fillText(name, left + labelWidth / 2, top + 8);
+      occupied.push({ left, top, right, bottom });
+      const center = left + labelWidth / 2;
+      if (hasPhoto) {
+        ctx.beginPath();
+        ctx.moveTo(center, bottom - 1);
+        ctx.lineTo(x, y - 8);
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = player.color;
+        ctx.stroke();
+        ellipse(ctx, center, top + 12, 12, 12, player.color);
+        const crop = Math.min(portrait.naturalWidth, portrait.naturalHeight);
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(center, top + 12, 10, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.drawImage(portrait, (portrait.naturalWidth - crop) / 2, (portrait.naturalHeight - crop) / 2,
+          crop, crop, left + 2, top + 2, 20, 20);
+        ctx.restore();
+      } else {
+        tile(ctx, left, top, labelWidth, labelHeight, 4, '#17182bf1');
+        ctx.fillStyle = rank === 0 ? '#f8e983' : '#fff';
+        ctx.textBaseline = 'middle';
+        ctx.textAlign = 'center';
+        ctx.fillText(name, center, top + 8);
+      }
       break;
     }
   }
@@ -272,7 +304,7 @@ export function createTrack(canvas) {
     }
     const occupied = [];
     for (const [index, player] of players.entries()) {
-      if (players.length <= 12 || index < 6 || player.boosted) driverLabel(player, poses[index], index, occupied);
+      driverLabel(player, poses[index], index, occupied);
     }
   };
 }

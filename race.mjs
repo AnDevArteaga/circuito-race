@@ -1,9 +1,21 @@
 export const defaults = { laps: 3, seconds: 120, maxRacers: 24, join: 'yo', boost: 'turbo', gifts: true };
+export const avatarDomains = ['tiktokcdn.com', 'tiktokcdn-us.com', 'tiktokcdn-eu.com', 'byteoversea.com', 'ibytedtos.com'];
 const colors = ['#ffd64c', '#ff779c', '#60ecd1', '#a898ff', '#fca268', '#7bd7ff', '#f692e7', '#d2f976'];
 const demoNames = ['Luna', 'Nico', 'Kiara', 'Drako', 'Nova', 'Sol', 'Axel', 'Mika'];
 const word = (value) => String(value ?? '').normalize('NFKC').trim().toLowerCase();
 const integer = (value, min, max, fallback) => Number.isInteger(value) && value >= min && value <= max ? value : fallback;
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+
+function profilePhoto(user, data) {
+  const candidates = [user.profilePictureUrl, data.profilePictureUrl, user.avatarThumb?.urlList?.[0]];
+  for (const candidate of candidates) {
+    if (typeof candidate !== 'string' || candidate.length > 2048) continue;
+    const url = URL.parse(candidate);
+    if (url?.protocol === 'https:' && !url.username && !url.password && !url.port &&
+        avatarDomains.some((domain) => url.hostname.endsWith('.' + domain))) return url.href;
+  }
+  return null;
+}
 
 export class Race {
   constructor() {
@@ -127,9 +139,13 @@ export class Race {
       if (this.seen.size > 10_000) this.seen.delete(this.seen.keys().next().value);
     }
 
+    const registered = this.players.get(id) ?? this.queue.get(id);
+    const avatar = profilePhoto(user, data);
+    if (registered && avatar) registered.avatar = avatar;
+
     if (event === 'chat') {
       const command = word(data.comment);
-      if (command === this.settings.join) this.join({ id, name });
+      if (command === this.settings.join && !registered) this.join({ id, name, avatar });
       if (command === this.settings.boost) this.turbo(this.players.get(id), 1.5, 'boost', 'Turbo de chat');
       return;
     }
@@ -189,8 +205,8 @@ export class Race {
       mode: this.mode, bridge: this.bridge, lastLiveEvent: this.lastLiveEvent, round: this.round,
       phase: this.phase, elapsed: this.elapsed, countdown: this.countdown, winner: this.winner,
       settings: this.settings, queued: this.queue.size, log: this.log,
-      players: this.ranking().map(({ id, name, color, lane, distance, effectUntil, finishAt }) =>
-        ({ id, name, color, lane, distance, boosted: effectUntil > this.elapsed && finishAt === null, finishAt })),
+      players: this.ranking().map(({ id, name, avatar, color, lane, distance, effectUntil, finishAt }) =>
+        ({ id, name, avatar: avatar ?? null, color, lane, distance, boosted: effectUntil > this.elapsed && finishAt === null, finishAt })),
     };
   }
 }

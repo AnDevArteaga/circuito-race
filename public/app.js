@@ -22,6 +22,7 @@ let lastLog;
 let lastRoster = '';
 let lastRules = '';
 let lastBoard = '';
+let lastStageBoard = '';
 let effectTimer;
 let noticeTimer;
 
@@ -30,6 +31,16 @@ function element(tag, text = '', className = '') {
   node.textContent = text;
   node.className = className;
   return node;
+}
+
+function addAvatar(row, avatar) {
+  if (!avatar) return;
+  const image = element('img', '', 'avatar');
+  image.alt = '';
+  image.referrerPolicy = 'no-referrer';
+  image.addEventListener('error', () => image.remove(), { once: true });
+  image.src = avatar;
+  row.append(image);
 }
 
 function displayCallout(title, subtitle = '', count = false) {
@@ -46,11 +57,17 @@ function stageHud() {
   const leadLap = Math.floor(Math.max(0, players[0]?.distance ?? 0)) + 1;
   $('lap').textContent = 'VUELTA ' + Math.min(leadLap, settings.laps) + '/' + settings.laps;
   const top = players.slice(0, 3);
-  $('stageRanking').replaceChildren(...top.map((player, index) => {
-    const row = element('div');
-    row.append(element('b', '#' + (index + 1)), document.createTextNode(player.name));
-    return row;
-  }));
+  const stageBoard = JSON.stringify(top.map(({ name, avatar }) => [name, avatar]));
+  if (stageBoard !== lastStageBoard) {
+    $('stageRanking').replaceChildren(...top.map((player, index) => {
+      const row = element('div');
+      row.append(element('b', '#' + (index + 1)));
+      addAvatar(row, player.avatar);
+      row.append(element('span', player.name, 'driver'));
+      return row;
+    }));
+    lastStageBoard = stageBoard;
+  }
   $('chatJoin').textContent = 'Escribe «' + settings.join + '» para correr';
   $('chatBoost').textContent = '«' + settings.boost + '» para acelerar';
   if (!streamReady) displayCallout('Reconectando con el juego');
@@ -120,15 +137,17 @@ function panelHud() {
     lastRoster = roster;
   }
 
-  const board = players.map((player) => [player.id, player.name, player.color, Math.floor(Math.max(0, player.distance)), player.finishAt]);
+  const board = players.map(({ id, name, avatar, color, distance, finishAt }) =>
+    [id, name, avatar, color, Math.floor(Math.max(0, distance)), finishAt]);
   const boardKey = JSON.stringify(board);
   if (boardKey !== lastBoard) {
-    $('ranking').replaceChildren(...board.map(([, name, color, lap, finish], index) => {
+    $('ranking').replaceChildren(...board.map(([, name, avatar, color, lap, finish], index) => {
       const row = element('li');
       const dot = element('span', '', 'dot');
       dot.style.backgroundColor = color;
-      row.append(element('span', String(index + 1), 'place'), dot, element('span', name, 'driver'),
-        element('small', finish === null ? 'V ' + (lap + 1) : finish.toFixed(1) + ' s'));
+      row.append(element('span', String(index + 1), 'place'), dot);
+      addAvatar(row, avatar);
+      row.append(element('span', name, 'driver'), element('small', finish === null ? 'V ' + (lap + 1) : finish.toFixed(1) + ' s'));
       return row;
     }));
     if (!board.length) $('ranking').append(element('li', 'Esperando pilotos.', 'muted'));

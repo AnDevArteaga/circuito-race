@@ -72,3 +72,24 @@ test('enfría el turbo de chat y finaliza por vueltas o por reloj', () => {
   assert.equal(race.winner, 'sol');
   assert.equal(race.players.get('sol').finishAt, null);
 });
+
+test('conserva la foto de TikTok de una ronda a otra y mantiene el nombre si falta la foto', () => {
+  const race = liveRace();
+  const photo = 'https://p16-sign.tiktokcdn-us.com/avatar.webp?signature=test';
+  const replacement = 'https://p16-sign-sg.tiktokcdn.com/avatar.webp';
+  race.consume({ event: 'chat', data: { uniqueId: 'Luna', nickname: 'Luna', comment: 'yo', profilePictureUrl: photo } });
+  chat(race, 'Sol', 'yo');
+  assert.equal(race.snapshot().players.find(({ id }) => id === 'luna').avatar, photo);
+  assert.equal(race.snapshot().players.find(({ id }) => id === 'sol').avatar, null);
+
+  race.consume({ event: 'chat', data: {
+    user: { uniqueId: 'Luna', avatarThumb: { urlList: [replacement] } }, comment: 'hola',
+  } });
+  race.consume({ event: 'chat', data: {
+    uniqueId: 'Sol', comment: 'hola', profilePictureUrl: 'https://tiktokcdn.com.example.org/avatar.webp',
+  } });
+  race.reset(false);
+  assert.equal(race.snapshot().players.find(({ id }) => id === 'luna').avatar, replacement);
+  assert.equal(race.snapshot().players.find(({ id }) => id === 'sol').name, 'Sol');
+  assert.equal(race.snapshot().players.find(({ id }) => id === 'sol').avatar, null);
+});
